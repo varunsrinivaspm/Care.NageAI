@@ -8,7 +8,7 @@ import { useState } from 'react'
 const links = [
   { href: '/', label: 'Care Board', icon: LayoutDashboard },
   { href: '/carepal', label: 'CarePal', icon: MessageCircle },
-  { href: '/doc-report', label: 'Doc Report', icon: FileText },
+  { href: '/doc-report', label: 'Care+', icon: FileText },
 ]
 
 export default function Navbar() {
@@ -49,6 +49,16 @@ export default function Navbar() {
           <button
             className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100"
             onClick={() => setOpen(!open)}
+            aria-label="Toggle menu"
+          >
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {/* Always-visible hamburger on desktop too (right side) */}
+          <button
+            className="hidden md:flex p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+            onClick={() => setOpen(!open)}
+            aria-label="Menu"
           >
             {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>

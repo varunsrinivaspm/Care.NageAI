@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Bell, RefreshCw, Loader2, AlertTriangle, Info } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, RefreshCw, Loader2, AlertTriangle, Info, Target } from 'lucide-react'
+import ScoreDetailModal, { ScoreType } from '@/components/ScoreDetailModal'
 
 interface Alert {
   type: string
@@ -38,32 +40,43 @@ interface ScoreData {
   }[]
 }
 
+const PERSONA_META: Record<string, { label: string; color: string; bar: string; desc: string }> = {
+  increase_muscle: { label: 'Increase Muscle', color: 'from-violet-500 to-violet-400', bar: 'bg-violet-500', desc: 'Muscle-building progress' },
+  decrease_fat:    { label: 'Decrease Fat',    color: 'from-amber-500 to-orange-400', bar: 'bg-amber-500',  desc: 'Fat-loss goal progress' },
+  stay_healthy:    { label: 'Stay Healthy',    color: 'from-emerald-500 to-emerald-400', bar: 'bg-emerald-500', desc: 'Overall wellness progress' },
+  custom:          { label: 'My Goal',         color: 'from-indigo-500 to-indigo-400', bar: 'bg-indigo-500', desc: 'Goal progress' },
+}
+
+function computeGoalProgress(persona: string, data: ScoreData): number {
+  const s = data.today.strain_score ?? 0
+  const r = data.today.recovery_score ?? 0
+  const sl = data.today.sleep_score ?? 0
+  switch (persona) {
+    case 'increase_muscle': return Math.min(Math.round(s * 0.6 + r * 0.4), 100)
+    case 'decrease_fat':    return Math.min(Math.round(s * 0.5 + sl * 0.3 + r * 0.2), 100)
+    case 'stay_healthy':    return Math.min(Math.round((s + r + sl) / 3), 100)
+    default:                return Math.min(Math.round((s + r + sl) / 3), 100)
+  }
+}
+
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   if (values.length < 2) return null
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const range = max - min || 1
+  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1
   const w = 80, h = 28
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w
-    const y = h - ((v - min) / range) * h
-    return `${x},${y}`
-  }).join(' ')
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ')
   return (
     <svg width={w} height={h} className="overflow-visible">
       <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {values.map((v, i) => (
-        <circle key={i} cx={(i / (values.length - 1)) * w} cy={h - ((v - min) / range) * h} r="2" fill={color} />
-      ))}
+      {values.map((v, i) => <circle key={i} cx={(i / (values.length - 1)) * w} cy={h - ((v - min) / range) * h} r="2" fill={color} />)}
     </svg>
   )
 }
 
 function scoreColor(score: number | null) {
-  if (score === null) return { bg: 'from-slate-400 to-slate-300', text: 'text-slate-400', badge: 'bg-slate-100 text-slate-500', spark: '#94a3b8', ring: 'ring-slate-200' }
-  if (score >= 75) return { bg: 'from-emerald-500 to-emerald-400', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', spark: '#10b981', ring: 'ring-emerald-200' }
-  if (score >= 50) return { bg: 'from-amber-500 to-amber-400', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700', spark: '#f59e0b', ring: 'ring-amber-200' }
-  return { bg: 'from-red-500 to-red-400', text: 'text-red-600', badge: 'bg-red-100 text-red-700', spark: '#ef4444', ring: 'ring-red-200' }
+  if (score === null) return { bg: 'from-slate-400 to-slate-300', text: 'text-slate-400', badge: 'bg-slate-100 text-slate-500', spark: '#94a3b8', ring: 'ring-slate-200', border: 'border-slate-200' }
+  if (score >= 75) return { bg: 'from-emerald-500 to-emerald-400', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', spark: '#10b981', ring: 'ring-emerald-200', border: 'border-emerald-200' }
+  if (score >= 50) return { bg: 'from-amber-500 to-amber-400', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700', spark: '#f59e0b', ring: 'ring-amber-200', border: 'border-amber-200' }
+  return { bg: 'from-red-500 to-red-400', text: 'text-red-600', badge: 'bg-red-100 text-red-700', spark: '#ef4444', ring: 'ring-red-200', border: 'border-red-200' }
 }
 
 function TrendIcon({ values }: { values: (number | null)[] }) {
@@ -76,10 +89,22 @@ function TrendIcon({ values }: { values: (number | null)[] }) {
 }
 
 export default function CareBoardPage() {
+  const router = useRouter()
   const [data, setData] = useState<ScoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [persona, setPersona] = useState<string>('stay_healthy')
+  const [modalScore, setModalScore] = useState<ScoreType | null>(null)
+
+  useEffect(() => {
+    // Check onboarding
+    const onboarded = localStorage.getItem('careNageOnboarded')
+    if (!onboarded) { router.push('/onboarding'); return }
+    const savedPersona = localStorage.getItem('careNagePersona') || 'stay_healthy'
+    setPersona(savedPersona)
+    fetchScores()
+  }, [])
 
   const fetchScores = async () => {
     setLoading(true)
@@ -102,57 +127,51 @@ export default function CareBoardPage() {
     }
   }
 
-  useEffect(() => { fetchScores() }, [])
-
   const t = data?.today
   const w = data?.weekly
   const hist = data?.history ?? []
-
-  const sparkFor = (key: 'sleep_score' | 'recovery_score' | 'strain_score' | 'care_score') =>
+  const sparkFor = (key: 'sleep_score' | 'recovery_score' | 'strain_score') =>
     hist.map(r => r[key]).filter(v => v !== null) as number[]
+
+  const personaMeta = PERSONA_META[persona] ?? PERSONA_META['stay_healthy']
+  const goalProgress = data ? computeGoalProgress(persona, data) : 0
+  const days = hist.map(r => new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }))
 
   const scores = [
     {
+      key: 'strain_score' as const,
+      type: 'strain' as ScoreType,
+      label: 'Strain Score',
+      icon: Zap,
+      score: t?.strain_score ?? null,
+      details: [
+        t?.steps ? `${t.steps.toLocaleString()} steps` : null,
+        w?.workout_count ? `${w.workout_count} workouts/week` : null,
+      ].filter(Boolean) as string[],
+    },
+    {
+      key: 'recovery_score' as const,
+      type: 'recovery' as ScoreType,
+      label: 'Recovery Score',
+      icon: Heart,
+      score: t?.recovery_score ?? null,
+      details: [
+        t?.hrv_ms ? `HRV ${Math.round(t.hrv_ms)}ms` : null,
+        w?.avg_resting_hr ? `RHR ${Math.round(w.avg_resting_hr)}bpm` : null,
+      ].filter(Boolean) as string[],
+    },
+    {
       key: 'sleep_score' as const,
+      type: 'sleep' as ScoreType,
       label: 'Sleep Score',
       icon: Moon,
       score: t?.sleep_score ?? null,
       details: [
         t?.sleep_hrs ? `${t.sleep_hrs}h total` : null,
         t?.deep_sleep_min ? `${Math.round(t.deep_sleep_min)}min deep` : null,
-        t?.rem_sleep_min  ? `${Math.round(t.rem_sleep_min)}min REM`  : null,
       ].filter(Boolean) as string[],
-    },
-    {
-      key: 'recovery_score' as const,
-      label: 'Recovery Score',
-      icon: Heart,
-      score: t?.recovery_score ?? null,
-      details: [
-        t?.hrv_ms         ? `HRV ${Math.round(t.hrv_ms)}ms`          : null,
-        w?.avg_resting_hr ? `RHR ${Math.round(w.avg_resting_hr)}bpm` : null,
-      ].filter(Boolean) as string[],
-    },
-    {
-      key: 'strain_score' as const,
-      label: 'Strain Score',
-      icon: Zap,
-      score: t?.strain_score ?? null,
-      details: [
-        t?.steps             ? `${t.steps.toLocaleString()} steps`    : null,
-        w?.workout_count     ? `${w.workout_count} workouts this week` : null,
-      ].filter(Boolean) as string[],
-    },
-    {
-      key: 'care_score' as const,
-      label: 'Care Score',
-      icon: Activity,
-      score: t?.care_score ?? null,
-      details: ['Composite health index'],
     },
   ]
-
-  const days = hist.map(r => new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }))
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -165,44 +184,61 @@ export default function CareBoardPage() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <button
-          onClick={fetchScores}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 px-3 py-2 rounded-xl transition-all hover:border-indigo-300 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+        <button onClick={fetchScores} disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 px-3 py-2 rounded-xl transition-all hover:border-indigo-300 disabled:opacity-50">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-          {error}
+      {/* L0 Goal Progress Bar */}
+      {data && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className={`bg-gradient-to-br ${personaMeta.color} rounded-lg p-1.5`}>
+                <Target className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{personaMeta.label}</p>
+                <p className="text-xs text-slate-400">{personaMeta.desc}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-slate-900">{goalProgress}%</p>
+              <p className="text-xs text-slate-400">goal completion</p>
+            </div>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+            <div
+              className={`h-full ${personaMeta.bar} rounded-full transition-all duration-1000 ease-out`}
+              style={{ width: `${goalProgress}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+            <span>Starting point</span>
+            <span>Goal achieved</span>
+          </div>
         </div>
       )}
 
-      {/* Dynamic Alerts */}
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Alerts */}
       {!loading && alerts.length > 0 && (
         <div className="space-y-2">
           {alerts.map((alert, i) => (
-            <div
-              key={i}
-              className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${
-                alert.severity === 'amber'
-                  ? 'bg-amber-50 border-amber-200 text-amber-800'
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
-              }`}
-            >
+            <div key={i} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${
+              alert.severity === 'amber' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'
+            }`}>
               {alert.severity === 'amber'
                 ? <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
-                : <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />
-              }
+                : <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />}
               <div>
                 <p className="font-semibold">{alert.message}</p>
-                <p className={`text-xs mt-0.5 ${
-                  alert.severity === 'amber' ? 'text-amber-600' : 'text-blue-600'
-                }`}>{alert.detail}</p>
+                <p className={`text-xs mt-0.5 ${alert.severity === 'amber' ? 'text-amber-600' : 'text-blue-600'}`}>{alert.detail}</p>
               </div>
             </div>
           ))}
@@ -211,8 +247,8 @@ export default function CareBoardPage() {
 
       {/* Loading skeleton */}
       {loading && !data && (
-        <div className="grid grid-cols-2 gap-4">
-          {[1,2,3,4].map(i => (
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse">
               <div className="h-4 bg-slate-100 rounded w-24 mb-4" />
               <div className="h-10 bg-slate-100 rounded w-16 mb-2" />
@@ -222,14 +258,18 @@ export default function CareBoardPage() {
         </div>
       )}
 
-      {/* Score Cards */}
+      {/* Score Cards — 3 only, no Care Score */}
       {!loading && (
-        <div className="grid grid-cols-2 gap-4">
-          {scores.map(({ key, label, icon: Icon, score, details }) => {
+        <div className="grid grid-cols-3 gap-4">
+          {scores.map(({ key, type, label, icon: Icon, score, details }) => {
             const c = scoreColor(score)
             const spark = sparkFor(key)
             return (
-              <div key={key} className={`bg-white rounded-2xl shadow-sm border border-slate-200 p-5 ring-2 ${c.ring} hover:shadow-md transition-all`}>
+              <button
+                key={key}
+                onClick={() => setModalScore(type)}
+                className={`bg-white rounded-2xl shadow-sm border ${c.border} p-5 ring-2 ${c.ring} hover:shadow-md hover:scale-[1.02] active:scale-[0.99] transition-all text-left cursor-pointer group`}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className={`bg-gradient-to-br ${c.bg} rounded-lg p-1.5`}>
@@ -239,24 +279,24 @@ export default function CareBoardPage() {
                   </div>
                   <TrendIcon values={spark} />
                 </div>
-
                 <div className="flex items-end justify-between">
                   <div>
                     {score !== null
                       ? <p className={`text-4xl font-black ${c.text}`}>{Math.round(score)}</p>
-                      : <p className="text-2xl font-bold text-slate-300">—</p>
-                    }
+                      : <p className="text-2xl font-bold text-slate-300">—</p>}
                     <p className="text-xs text-slate-400 mt-0.5">/ 100</p>
                   </div>
                   {spark.length >= 2 && <Sparkline values={spark} color={c.spark} />}
                 </div>
-
                 {details.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-3 gap-y-1">
                     {details.map(d => <span key={d} className="text-xs text-slate-500">{d}</span>)}
                   </div>
                 )}
-              </div>
+                <div className="mt-2 flex items-center gap-1 text-xs text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span>View details</span><ChevronRight className="w-3 h-3" />
+                </div>
+              </button>
             )
           })}
         </div>
@@ -278,7 +318,7 @@ export default function CareBoardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {(['sleep_score', 'recovery_score', 'strain_score', 'care_score'] as const).map(key => (
+                {(['strain_score', 'recovery_score', 'sleep_score'] as const).map(key => (
                   <tr key={key} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-3 font-medium text-slate-700 capitalize">{key.replace('_score', '')}</td>
                     {hist.map((r, i) => {
@@ -288,8 +328,7 @@ export default function CareBoardPage() {
                         <td key={i} className="px-2 py-3 text-center">
                           {v !== null
                             ? <span className={`inline-block w-9 text-center text-xs font-semibold px-1 py-0.5 rounded-md ${c.badge}`}>{Math.round(v)}</span>
-                            : <span className="text-slate-300">—</span>
-                          }
+                            : <span className="text-slate-300">—</span>}
                         </td>
                       )
                     })}
@@ -324,13 +363,33 @@ export default function CareBoardPage() {
       )}
 
       {/* Goal banner */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-2xl p-5 text-white flex items-center justify-between">
+      <div className={`bg-gradient-to-r ${personaMeta.color} rounded-2xl p-5 text-white flex items-center justify-between`}>
         <div>
-          <p className="text-indigo-200 text-xs font-medium uppercase tracking-wide mb-1">Active Goals</p>
-          <p className="font-semibold">Fat loss · Muscle gain · Tennis · Cardio</p>
+          <p className="text-white/70 text-xs font-medium uppercase tracking-wide mb-1">Active Goal</p>
+          <p className="font-semibold">{personaMeta.label}</p>
         </div>
-        <ChevronRight className="w-5 h-5 text-indigo-300 flex-shrink-0" />
+        <button onClick={() => router.push('/onboarding')} className="text-xs text-white/70 hover:text-white flex items-center gap-1 transition-colors">
+          Change <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
+
+      {/* Score Detail Modal */}
+      {modalScore && data && (
+        <ScoreDetailModal
+          scoreType={modalScore}
+          score={
+            modalScore === 'strain' ? t?.strain_score ?? null
+            : modalScore === 'recovery' ? t?.recovery_score ?? null
+            : t?.sleep_score ?? null
+          }
+          data={{
+            today: data.today,
+            weekly: data.weekly,
+            history: data.history,
+          }}
+          onClose={() => setModalScore(null)}
+        />
+      )}
     </div>
   )
 }
