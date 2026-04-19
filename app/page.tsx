@@ -96,11 +96,18 @@ export default function CareBoardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [persona, setPersona] = useState<string>('stay_healthy')
   const [modalScore, setModalScore] = useState<ScoreType | null>(null)
+  const [firstName, setFirstName] = useState('Varun')
 
   useEffect(() => {
     const savedPersona = localStorage.getItem('careNagePersona') || 'stay_healthy'
     setPersona(savedPersona)
     fetchScores()
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => {
+        const full = data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? ''
+        if (full) setFirstName(full.split(' ')[0])
+      })
+    })
   }, [])
 
   const fetchScores = async () => {
@@ -175,7 +182,7 @@ export default function CareBoardPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Good Morning, Varun</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Good Morning, {firstName}</h1>
           <p className="text-slate-400 text-xs mt-1">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
