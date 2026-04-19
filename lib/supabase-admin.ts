@@ -7,14 +7,8 @@ export const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const DEMO_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+export const DEMO_USER_ID = '66d35c8f-3db8-4c0b-80d3-9a8553e3605e'
 
-// Get the authenticated user ID from the session, fall back to demo user
 export async function getAuthUserId(): Promise<string> {
-  try {
-    const client = await createSupabaseServerClient()
-    const { data: { user } } = await client.auth.getUser()
-    if (user?.id) return user.id
-  } catch {}
   return DEMO_USER_ID
 }
