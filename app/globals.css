@@ -14,30 +14,3 @@ body {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-@media print {
-  /* Hide everything by default */
-  body > * { display: none !important; }
-
-  /* Show only the report target and its parents */
-  #report-print-target,
-  #report-print-target * {
-    display: revert !important;
-    visibility: visible !important;
-  }
-
-  /* Make report fill the page */
-  #report-print-target {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-  }
-
-  /* Hide the export button itself in print */
-  #report-print-target button {
-    display: none !important;
-  }
-}
