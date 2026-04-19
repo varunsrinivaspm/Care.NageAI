@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, Send, Bot, User, Loader2, Trash2 } from 'lucide-react'
+import { MessageCircle, Send, Bot, User, Loader2, Trash2, Paperclip, X, FileText, Image } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 interface Message {
@@ -23,8 +23,11 @@ export default function CarePalPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [morningLoading, setMorningLoading] = useState(false)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [uploadError, setUploadError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const hasSentMorning = useRef(false)
 
   useEffect(() => {
@@ -82,13 +85,20 @@ export default function CarePalPage() {
   }, [])
 
   const sendMessage = async (text?: string) => {
-    const content = text ?? input.trim()
-    if (!content || loading) return
+    let content = text ?? input.trim()
+    if (!content && !attachedFile) return
+    if (loading) return
+
+    // Append file context to message
+    if (attachedFile && !content) content = `I\'ve uploaded a medical file: ${attachedFile.name}. Please acknowledge and tell me how you can help analyse it.`
+    else if (attachedFile) content = `${content}\n\n[Attached: ${attachedFile.name}]`
 
     const userMsg: Message = { role: 'user', content }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
+    setAttachedFile(null)
+    setUploadError('')
     setLoading(true)
 
     const assistantMsg: Message = { role: 'assistant', content: '' }
@@ -262,29 +272,65 @@ export default function CarePalPage() {
       </div>
 
       {/* Input */}
-      <div className="mt-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-end gap-3 px-4 py-3">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about your scores, sleep, workouts, or symptoms..."
-          rows={1}
-          className="flex-1 resize-none outline-none text-sm text-slate-800 placeholder-slate-400 max-h-32 bg-transparent"
-          style={{ height: 'auto' }}
-          onInput={e => {
-            const t = e.target as HTMLTextAreaElement
-            t.style.height = 'auto'
-            t.style.height = t.scrollHeight + 'px'
-          }}
-        />
-        <button
-          onClick={() => sendMessage()}
-          disabled={!input.trim() || loading}
-          className="bg-indigo-600 text-white rounded-xl p-2.5 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
+      <div className="mt-4 space-y-2">
+        {/* File badge */}
+        {attachedFile && (
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
+            {attachedFile.type.startsWith('image/') ? <Image className="w-4 h-4 text-indigo-500 flex-shrink-0" /> : <FileText className="w-4 h-4 text-indigo-500 flex-shrink-0" />}
+            <span className="text-xs text-indigo-700 font-medium truncate flex-1">{attachedFile.name}</span>
+            <span className="text-xs text-indigo-400">{(attachedFile.size / 1024).toFixed(0)} KB</span>
+            <button onClick={() => setAttachedFile(null)} className="text-indigo-400 hover:text-indigo-600 flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
+        {uploadError && <p className="text-xs text-red-500 px-1">{uploadError}</p>}
+
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex items-end gap-2 px-4 py-3">
+          {/* File upload button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              if (file.size > 10 * 1024 * 1024) { setUploadError('File must be under 10MB'); return }
+              setAttachedFile(file)
+              setUploadError('')
+              e.target.value = ''
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-slate-400 hover:text-indigo-500 flex-shrink-0 p-1 rounded-lg hover:bg-indigo-50 transition-all"
+            title="Attach prescription, report, or scan"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={attachedFile ? 'Add a note about this file… (optional)' : 'Ask about your scores, sleep, workouts, or symptoms…'}
+            rows={1}
+            className="flex-1 resize-none outline-none text-sm text-slate-800 placeholder-slate-400 max-h-32 bg-transparent"
+            style={{ height: 'auto' }}
+            onInput={e => {
+              const t = e.target as HTMLTextAreaElement
+              t.style.height = 'auto'
+              t.style.height = t.scrollHeight + 'px'
+            }}
+          />
+          <button
+            onClick={() => sendMessage()}
+            disabled={(!input.trim() && !attachedFile) || loading}
+            className="bg-indigo-600 text-white rounded-xl p-2.5 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
       <p className="text-xs text-slate-400 text-center mt-2">
         CarePal is an AI assistant. Always consult a qualified healthcare professional for medical decisions.

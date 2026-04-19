@@ -118,65 +118,230 @@ export default function DocReportPage() {
   }
 
   const handleExportPdf = () => {
-    const el = document.getElementById('report-print-target')
-    if (!el) return
+    const bio = (() => { try { return JSON.parse(localStorage.getItem('careNageBio') || '{}') } catch { return {} } })()
+    const persona = localStorage.getItem('careNagePersona') || 'stay_healthy'
+    const personaLabel: Record<string, string> = {
+      increase_muscle: 'Increase Muscle Mass',
+      decrease_fat: 'Decrease Body Fat',
+      stay_healthy: 'Maintain Overall Health',
+      custom: 'Custom Goal',
+    }
 
-    const win = window.open('', '_blank', 'width=900,height=700')
+    const avgSleep = avg(vitals.map(v => v.sleep_hrs))
+    const avgDeep = avg(vitals.map(v => v.deep_min))
+    const avgRem = avg(vitals.map(v => v.rem_min))
+    const avgSteps = avg(vitals.map(v => v.steps))
+    const avgStrain = avg(vitals.map(v => v.strain_score))
+    const avgRecovery = avg(vitals.map(v => v.recovery_score))
+    const avgSleepScore = avg(vitals.map(v => v.sleep_score))
+
+    const win = window.open('', '_blank', 'width=1000,height=780')
     if (!win) return
 
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>CareNageAI — Doctor Report</title>
-          <meta charset="utf-8" />
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1a202c; padding: 32px; }
-            .header { background: linear-gradient(to right, #4f46e5, #6366f1); color: white; padding: 20px 24px; border-radius: 12px 12px 0 0; display: flex; align-items: center; justify-content: space-between; }
-            .header h2 { font-size: 16px; font-weight: 600; }
-            .header .icon-row { display: flex; align-items: center; gap: 8px; }
-            .body { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; padding: 24px; }
-            .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 8px; }
-            .summary-box { background: #f8fafc; border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.6; color: #475569; margin-bottom: 20px; }
-            ul { list-style: none; margin-bottom: 20px; }
-            ul li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #334155; margin-bottom: 8px; line-height: 1.5; }
-            .num { width: 20px; height: 20px; background: #e0e7ff; color: #4f46e5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
-            .check { color: #10b981; flex-shrink: 0; margin-top: 2px; }
-            .q-label { color: #6366f1; font-weight: 700; flex-shrink: 0; }
-            .footer { border-top: 1px solid #f1f5f9; padding-top: 12px; font-size: 11px; color: #94a3b8; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="icon-row"><h2>&#x1F4CB; AI-Generated Doctor Summary</h2></div>
-            <span style="font-size:11px;opacity:0.8">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          </div>
-          <div class="body">
-            <div class="section-label">Summary</div>
-            <div class="summary-box">${report?.summary ?? ''}</div>
+    const scoreBar = (val: number | null, color: string) => {
+      const pct = val ?? 0
+      return `<div style="display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:#1e293b;min-width:28px;text-align:right;">${val !== null ? Math.round(val) : '—'}</span>
+      </div>`
+    }
 
-            ${ report?.keyFindings?.length ? `
-              <div class="section-label">Key Findings</div>
-              <ul>${report.keyFindings.map((f, i) => `<li><span class="num">${i+1}</span>${f}</li>`).join('')}</ul>
-            ` : '' }
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>CareNageAI Clinical Report</title>
+  <meta charset="utf-8"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;color:#1e293b;background:#fff;padding:20px 24px;}
+    /* TOP HEADER */
+    .top-header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1e293b;padding-bottom:8px;margin-bottom:10px;}
+    .brand{display:flex;align-items:center;gap:8px;}
+    .brand-logo{width:28px;height:28px;background:#4f46e5;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:900;}
+    .brand-name{font-size:18px;font-weight:900;color:#1e293b;}
+    .brand-name span{color:#4f46e5;}
+    .brand-sub{font-size:9px;color:#64748b;}
+    .header-right{text-align:right;font-size:9px;color:#64748b;line-height:1.6;}
+    /* PATIENT BAR */
+    .patient-bar{display:grid;grid-template-columns:repeat(6,1fr);gap:0;border:1px solid #cbd5e1;margin-bottom:12px;}
+    .patient-cell{padding:5px 8px;border-right:1px solid #cbd5e1;}
+    .patient-cell:last-child{border-right:none;}
+    .patient-cell .label{font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;}
+    .patient-cell .value{font-size:11px;font-weight:700;color:#1e293b;margin-top:2px;}
+    /* TWO-COLUMN LAYOUT */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    /* SECTION */
+    .section{margin-bottom:10px;}
+    .section-title{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#fff;background:#1e293b;padding:3px 8px;margin-bottom:0;}
+    .section-title.indigo{background:#4f46e5;}
+    .section-title.emerald{background:#059669;}
+    .section-title.amber{background:#d97706;}
+    .section-title.violet{background:#7c3aed;}
+    /* TABLE */
+    table{width:100%;border-collapse:collapse;font-size:10px;}
+    table td,table th{padding:3.5px 8px;border-bottom:1px solid #f1f5f9;}
+    table th{font-weight:600;color:#64748b;font-size:8.5px;text-transform:uppercase;background:#f8fafc;}
+    .td-label{color:#475569;width:45%;}
+    .td-val{font-weight:700;color:#1e293b;text-align:right;}
+    .td-val.good{color:#059669;}
+    .td-val.warn{color:#d97706;}
+    .td-val.bad{color:#dc2626;}
+    /* SCORE CHIP */
+    .chip{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;}
+    .chip.green{background:#d1fae5;color:#065f46;}
+    .chip.yellow{background:#fef3c7;color:#92400e;}
+    .chip.red{background:#fee2e2;color:#991b1b;}
+    /* LIST */
+    ul.findings{list-style:none;padding:0;margin:0;}
+    ul.findings li{padding:3px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#334155;display:flex;align-items:flex-start;gap:5px;}
+    ul.findings li::before{content:'•';color:#4f46e5;font-weight:900;flex-shrink:0;}
+    ul.recs li::before{content:'✓';color:#059669;font-weight:900;flex-shrink:0;}
+    ul.qs li::before{content:'Q';color:#7c3aed;font-weight:900;flex-shrink:0;font-size:8px;margin-top:1px;}
+    .foot{border-top:1px solid #e2e8f0;padding-top:6px;margin-top:10px;display:flex;justify-content:space-between;font-size:8.5px;color:#94a3b8;}
+    @media print{body{padding:10px 14px;}}
+  </style>
+</head>
+<body>
+  <!-- TOP HEADER -->
+  <div class="top-header">
+    <div class="brand">
+      <div class="brand-logo">C</div>
+      <div>
+        <div class="brand-name">CareNage<span>AI</span></div>
+        <div class="brand-sub">Precision Health Intelligence Platform</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <strong>CARE REPORT</strong><br/>
+      Generated: ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}<br/>
+      Period: ${dateRange}<br/>
+      Data Source: Apple Health (Real)
+    </div>
+  </div>
 
-            ${ report?.recommendations?.length ? `
-              <div class="section-label">Recommendations</div>
-              <ul>${report.recommendations.map(r => `<li><span class="check">&#10003;</span>${r}</li>`).join('')}</ul>
-            ` : '' }
+  <!-- PATIENT BAR -->
+  <div class="patient-bar">
+    <div class="patient-cell"><div class="label">Patient</div><div class="value">Varane</div></div>
+    <div class="patient-cell"><div class="label">Age</div><div class="value">28</div></div>
+    <div class="patient-cell"><div class="label">Height</div><div class="value">${bio.height ? bio.height + ' cm' : '—'}</div></div>
+    <div class="patient-cell"><div class="label">Weight</div><div class="value">${bio.weight ? bio.weight + ' kg' : '—'}</div></div>
+    <div class="patient-cell"><div class="label">Body Fat</div><div class="value">${bio.bodyFat ? bio.bodyFat + ' %' : '—'}</div></div>
+    <div class="patient-cell"><div class="label">Goal</div><div class="value" style="font-size:9px;">${personaLabel[persona] ?? persona}</div></div>
+  </div>
 
-            ${ report?.questionsForDoctor?.length ? `
-              <div class="section-label">Questions for Your Doctor</div>
-              <ul>${report.questionsForDoctor.map((q, i) => `<li><span class="q-label">Q${i+1}.</span>${q}</li>`).join('')}</ul>
-            ` : '' }
+  <!-- TWO-COLUMN BODY -->
+  <div class="two-col">
+    <!-- LEFT COLUMN -->
+    <div>
+      <!-- Body Composition -->
+      <div class="section">
+        <div class="section-title">Body Composition Analysis</div>
+        <table>
+          <tr><td class="td-label">Weight</td><td class="td-val">${bio.weight ? bio.weight + ' kg' : '—'}</td></tr>
+          <tr><td class="td-label">Height</td><td class="td-val">${bio.height ? bio.height + ' cm' : '—'}</td></tr>
+          <tr><td class="td-label">Body Fat %</td><td class="td-val ${bio.bodyFat && Number(bio.bodyFat) > 25 ? 'warn' : 'good'}">${bio.bodyFat ? bio.bodyFat + ' %' : '—'}</td></tr>
+          <tr><td class="td-label">BMI (est.)</td><td class="td-val">${bio.weight && bio.height ? (Number(bio.weight) / ((Number(bio.height)/100)**2)).toFixed(1) : '—'}</td></tr>
+          <tr><td class="td-label">Primary Goal</td><td class="td-val">${personaLabel[persona] ?? persona}</td></tr>
+          <tr><td class="td-label">Conditions</td><td class="td-val">Deviated septum</td></tr>
+          <tr><td class="td-label">Medications</td><td class="td-val">None</td></tr>
+        </table>
+      </div>
 
-            <div class="footer">Based on real Apple Health data &middot; Generated by CareNageAI</div>
-          </div>
-        </body>
-      </html>
-    `)
+      <!-- Sleep Analysis -->
+      <div class="section">
+        <div class="section-title violet">Sleep Analysis (${dateRange})</div>
+        <table>
+          <tr><td class="td-label">Avg Total Sleep</td><td class="td-val ${avgSleep !== null && avgSleep < 6 ? 'bad' : avgSleep !== null && avgSleep < 7 ? 'warn' : 'good'}">${avgSleep !== null ? avgSleep + ' h' : '—'}</td></tr>
+          <tr><td class="td-label">Avg Deep Sleep</td><td class="td-val">${avgDeep !== null ? avgDeep + ' min' : '—'}</td></tr>
+          <tr><td class="td-label">Avg REM Sleep</td><td class="td-val">${avgRem !== null ? avgRem + ' min' : '—'}</td></tr>
+          <tr><td class="td-label">Avg Light Sleep (est.)</td><td class="td-val">${avgSleep && avgDeep && avgRem ? Math.max(Math.round(avgSleep * 60 - avgDeep - avgRem - 30), 0) + ' min' : '—'}</td></tr>
+          <tr><td class="td-label">Sleep Score</td><td class="td-val">${avgSleepScore !== null ? Math.round(avgSleepScore) + ' / 100' : '—'}</td></tr>
+          <tr><td class="td-label">Nights Analysed</td><td class="td-val">${vitals.filter(v => v.sleep_hrs).length}</td></tr>
+        </table>
+      </div>
+
+      <!-- Activity & Strain -->
+      <div class="section">
+        <div class="section-title amber">Activity & Strain (${dateRange})</div>
+        <table>
+          <tr><td class="td-label">Avg Daily Steps</td><td class="td-val ${avgSteps !== null && avgSteps < 5000 ? 'bad' : avgSteps !== null && avgSteps < 8000 ? 'warn' : 'good'}">${avgSteps !== null ? Number(Math.round(avgSteps)).toLocaleString() : '—'}</td></tr>
+          <tr><td class="td-label">Step Target</td><td class="td-val">10,000 / day</td></tr>
+          <tr><td class="td-label">Avg Strain Score</td><td class="td-val">${avgStrain !== null ? Math.round(avgStrain) + ' / 100' : '—'}</td></tr>
+          <tr><td class="td-label">Days Analysed</td><td class="td-val">${vitals.length}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <!-- Score Panel -->
+      <div class="section">
+        <div class="section-title indigo">CareNageAI Score Summary</div>
+        <table>
+          <tr><th>Metric</th><th>Score / 100</th><th>Status</th></tr>
+          <tr>
+            <td class="td-label">Sleep Score</td>
+            <td>${scoreBar(avgSleepScore, '#8b5cf6')}</td>
+            <td><span class="chip ${avgSleepScore !== null && avgSleepScore >= 75 ? 'green' : avgSleepScore !== null && avgSleepScore >= 50 ? 'yellow' : 'red'}">${avgSleepScore !== null && avgSleepScore >= 75 ? 'Optimal' : avgSleepScore !== null && avgSleepScore >= 50 ? 'Fair' : 'Low'}</span></td>
+          </tr>
+          <tr>
+            <td class="td-label">Recovery Score</td>
+            <td>${scoreBar(avgRecovery, '#10b981')}</td>
+            <td><span class="chip ${avgRecovery !== null && avgRecovery >= 75 ? 'green' : avgRecovery !== null && avgRecovery >= 50 ? 'yellow' : 'red'}">${avgRecovery !== null && avgRecovery >= 75 ? 'Optimal' : avgRecovery !== null && avgRecovery >= 50 ? 'Fair' : 'Low'}</span></td>
+          </tr>
+          <tr>
+            <td class="td-label">Strain Score</td>
+            <td>${scoreBar(avgStrain, '#f59e0b')}</td>
+            <td><span class="chip ${avgStrain !== null && avgStrain >= 75 ? 'green' : avgStrain !== null && avgStrain >= 50 ? 'yellow' : 'red'}">${avgStrain !== null && avgStrain >= 75 ? 'High' : avgStrain !== null && avgStrain >= 50 ? 'Moderate' : 'Low'}</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- AI Summary -->
+      ${ report ? `
+      <div class="section">
+        <div class="section-title">Clinical Summary</div>
+        <div style="padding:6px 8px;font-size:10px;line-height:1.6;color:#334155;border-bottom:1px solid #f1f5f9;">${report.summary}</div>
+      </div>` : '' }
+
+      <!-- Key Findings -->
+      ${ report?.keyFindings?.length ? `
+      <div class="section">
+        <div class="section-title emerald">Key Findings (Doctor Attention Required)</div>
+        <ul class="findings">
+          ${report.keyFindings.map(f => `<li>${f}</li>`).join('')}
+        </ul>
+      </div>` : '' }
+
+      <!-- Recommendations -->
+      ${ report?.recommendations?.length ? `
+      <div class="section">
+        <div class="section-title">Clinical Recommendations</div>
+        <ul class="findings recs">
+          ${report.recommendations.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+      </div>` : '' }
+
+      <!-- Questions for Doctor -->
+      ${ report?.questionsForDoctor?.length ? `
+      <div class="section">
+        <div class="section-title violet">Questions for Doctor</div>
+        <ul class="findings qs">
+          ${report.questionsForDoctor.map(q => `<li>${q}</li>`).join('')}
+        </ul>
+      </div>` : '' }
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="foot">
+    <span>CareNageAI &mdash; Powered by real Apple Health biometric data (Aug 2024 &ndash; Mar 2026)</span>
+    <span>Patient: Varane &nbsp;|&nbsp; Report Date: ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+  </div>
+</body>
+</html>`)
     win.document.close()
     win.focus()
     setTimeout(() => { win.print(); win.close() }, 500)
@@ -194,9 +359,9 @@ export default function DocReportPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <FileText className="w-6 h-6 text-indigo-500" />
-            Doc 1-Pager
+            Care+
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">AI-generated summary from your real Apple Health data</p>
+          <p className="text-slate-500 mt-1 text-sm">AI-generated clinical report from your real Apple Health data</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
