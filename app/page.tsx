@@ -99,6 +99,8 @@ export default function CareBoardPage() {
   const [firstName, setFirstName] = useState('Varun')
 
   useEffect(() => {
+    const onboarded = localStorage.getItem('careNageOnboarded')
+    if (!onboarded) { router.push('/onboarding'); return }
     const savedPersona = localStorage.getItem('careNagePersona') || 'stay_healthy'
     setPersona(savedPersona)
     fetchScores()

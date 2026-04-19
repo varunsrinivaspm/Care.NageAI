@@ -39,6 +39,22 @@ export default function DocReportPage() {
   const [loadingVitals, setLoadingVitals] = useState(true)
   const [report, setReport] = useState<GeneratedReport | null>(null)
   const [error, setError] = useState('')
+  const [profile, setProfile] = useState({ goals: '', conditions: '', medications: '', persona: 'stay_healthy' })
+
+  useEffect(() => {
+    const q = (() => { try { return JSON.parse(localStorage.getItem('careNageQuestionnaire') || '{}') } catch { return {} } })()
+    const persona = localStorage.getItem('careNagePersona') || 'stay_healthy'
+    const personaLabel: Record<string, string> = {
+      increase_muscle: 'Increase Muscle', decrease_fat: 'Decrease Fat',
+      stay_healthy: 'Stay Healthy', custom: 'Custom Goal',
+    }
+    setProfile({
+      goals: personaLabel[persona] ?? persona,
+      conditions: q.geneticConditions || 'None',
+      medications: q.medications || 'None',
+      persona,
+    })
+  }, [])
 
   useEffect(() => { fetchVitals() }, [dateRange])
 
@@ -423,9 +439,9 @@ export default function DocReportPage() {
         </div>
         <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           {[
-            { label: 'Goals', value: 'Fat loss · Muscle gain · Tennis · Cardio' },
-            { label: 'Conditions', value: 'Deviated septum' },
-            { label: 'Medications', value: 'None' },
+            { label: 'Goals', value: profile.goals },
+            { label: 'Conditions', value: profile.conditions },
+            { label: 'Medications', value: profile.medications },
           ].map(({ label, value }) => (
             <div key={label} className="px-6 py-4">
               <p className="text-xs text-slate-400 font-medium mb-1">{label}</p>
