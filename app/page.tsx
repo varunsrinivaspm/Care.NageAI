@@ -175,7 +175,8 @@ export default function CareBoardPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Good Morning, Varun 👋</h1>
+          <p className="text-slate-500 text-sm">Good morning,</p>
+          <h1 className="text-2xl font-bold text-slate-900">Varun</h1>
           <p className="text-slate-400 text-xs mt-1">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
