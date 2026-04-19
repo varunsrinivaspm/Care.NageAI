@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, Send, Bot, User, Loader2, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -201,7 +202,48 @@ export default function CarePalPage() {
                     : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
                 }`}
               >
-                {msg.content || (
+                {msg.role === 'user' ? (
+                  msg.content || (
+                    <span className="flex items-center gap-1.5 text-white/70">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Thinking...
+                    </span>
+                  )
+                ) : msg.content ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-slate-600">{children}</em>,
+                      h1: ({ children }) => <h1 className="text-base font-bold text-slate-900 mt-3 mb-1 first:mt-0">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-sm font-bold text-slate-900 mt-3 mb-1 first:mt-0">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold text-indigo-700 mt-3 mb-1 first:mt-0">{children}</h3>,
+                      ul: ({ children }) => <ul className="space-y-1 my-2 ml-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="space-y-1 my-2 ml-1 list-decimal list-inside">{children}</ol>,
+                      li: ({ children }) => (
+                        <li className="flex items-start gap-2 text-slate-700">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                          <span>{children}</span>
+                        </li>
+                      ),
+                      hr: () => <hr className="my-3 border-slate-200" />,
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-2 border-indigo-300 pl-3 my-2 text-slate-600 italic">{children}</blockquote>
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-3 rounded-lg border border-slate-200">
+                          <table className="w-full text-xs">{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-indigo-50">{children}</thead>,
+                      th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-indigo-700 border-b border-slate-200">{children}</th>,
+                      td: ({ children }) => <td className="px-3 py-2 border-b border-slate-100 text-slate-700">{children}</td>,
+                      code: ({ children }) => <code className="bg-slate-100 text-indigo-600 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                ) : (
                   <span className="flex items-center gap-1.5 text-slate-400">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Thinking...
