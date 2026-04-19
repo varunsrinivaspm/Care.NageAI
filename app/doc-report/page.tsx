@@ -539,6 +539,16 @@ export default function DocReportPage() {
             rows={3}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 resize-none transition-all placeholder-slate-400"
           />
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !symptoms.trim()}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-sm"
+            >
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              {generating ? 'Generating...' : 'Add to Report'}
+            </button>
+          </div>
         </div>
       </div>
 
