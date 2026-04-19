@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Bell, RefreshCw, Loader2 } from 'lucide-react'
+import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Bell, RefreshCw, Loader2, AlertTriangle, Info } from 'lucide-react'
+
+interface Alert {
+  type: string
+  message: string
+  detail: string
+  severity: 'amber' | 'info'
+}
 
 interface ScoreData {
   today: {
@@ -72,14 +79,22 @@ export default function CareBoardPage() {
   const [data, setData] = useState<ScoreData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [alerts, setAlerts] = useState<Alert[]>([])
 
   const fetchScores = async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/scores')
-      if (!res.ok) throw new Error('Failed to fetch')
-      setData(await res.json())
+      const [scoresRes, alertsRes] = await Promise.all([
+        fetch('/api/scores'),
+        fetch('/api/alerts'),
+      ])
+      if (!scoresRes.ok) throw new Error('Failed to fetch')
+      setData(await scoresRes.json())
+      if (alertsRes.ok) {
+        const alertData = await alertsRes.json()
+        setAlerts(alertData.alerts ?? [])
+      }
     } catch {
       setError('Could not load scores — check Supabase connection')
     } finally {
@@ -164,6 +179,33 @@ export default function CareBoardPage() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* Dynamic Alerts */}
+      {!loading && alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((alert, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${
+                alert.severity === 'amber'
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+              }`}
+            >
+              {alert.severity === 'amber'
+                ? <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                : <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />
+              }
+              <div>
+                <p className="font-semibold">{alert.message}</p>
+                <p className={`text-xs mt-0.5 ${
+                  alert.severity === 'amber' ? 'text-amber-600' : 'text-blue-600'
+                }`}>{alert.detail}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

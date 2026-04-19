@@ -117,6 +117,10 @@ export default function DocReportPage() {
     }
   }
 
+  const handleExportPdf = () => {
+    window.print()
+  }
+
   const avg = (arr: (number | null)[]) => {
     const clean = arr.filter(v => v !== null) as number[]
     return clean.length ? Math.round(clean.reduce((a, b) => a + b, 0) / clean.length * 10) / 10 : null
@@ -283,13 +287,16 @@ export default function DocReportPage() {
 
       {/* AI Report */}
       {report && (
-        <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden ring-2 ring-indigo-50">
+        <div id="report-print-target" className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden ring-2 ring-indigo-50">
           <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
               <h2 className="font-semibold">AI-Generated Doctor Summary</h2>
             </div>
-            <button className="flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-all">
+            <button
+              onClick={handleExportPdf}
+              className="flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-all"
+            >
               <Download className="w-3.5 h-3.5" />Export PDF
             </button>
           </div>

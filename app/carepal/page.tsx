@@ -15,16 +15,70 @@ const suggestions = [
   'Give me a 3-step morning routine based on my current scores',
 ]
 
+const MORNING_PROMPT = 'Generate my morning health summary with my top 3 action items based on today\'s scores and recent trends. Keep it warm, motivating, and concise.'
+
 export default function CarePalPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [morningLoading, setMorningLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const hasSentMorning = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Morning check-in: auto-generate health summary on first load
+  useEffect(() => {
+    if (hasSentMorning.current) return
+    hasSentMorning.current = true
+    setMorningLoading(true)
+
+    const runMorning = async () => {
+      const userMsg: Message = { role: 'user', content: MORNING_PROMPT }
+      const assistantMsg: Message = { role: 'assistant', content: '' }
+      setMessages([userMsg, assistantMsg])
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [userMsg] }),
+        })
+        if (!res.body) throw new Error('No body')
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value)
+          setMessages(prev => {
+            const updated = [...prev]
+            updated[updated.length - 1] = {
+              ...updated[updated.length - 1],
+              content: updated[updated.length - 1].content + chunk,
+            }
+            return updated
+          })
+        }
+      } catch {
+        setMessages(prev => {
+          const updated = [...prev]
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: 'Good morning! I had trouble loading your health summary. Try asking me anything.',
+          }
+          return updated
+        })
+      } finally {
+        setMorningLoading(false)
+      }
+    }
+
+    runMorning()
+  }, [])
 
   const sendMessage = async (text?: string) => {
     const content = text ?? input.trim()
