@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, RefreshCw, Loader2, AlertTriangle, Info, Target } from 'lucide-react'
+import { Moon, Heart, Zap, Activity, TrendingUp, TrendingDown, Minus, ChevronRight, RefreshCw, AlertTriangle, Info, Target } from 'lucide-react'
 import ScoreDetailModal, { ScoreType } from '@/components/ScoreDetailModal'
 
 interface Alert {
@@ -98,9 +98,6 @@ export default function CareBoardPage() {
   const [modalScore, setModalScore] = useState<ScoreType | null>(null)
 
   useEffect(() => {
-    // Check onboarding
-    const onboarded = localStorage.getItem('careNageOnboarded')
-    if (!onboarded) { router.push('/onboarding'); return }
     const savedPersona = localStorage.getItem('careNagePersona') || 'stay_healthy'
     setPersona(savedPersona)
     fetchScores()
@@ -178,8 +175,7 @@ export default function CareBoardPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-slate-500 text-sm">Good morning,</p>
-          <h1 className="text-2xl font-bold text-slate-900">Varane</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Good Morning, Varun 👋</h1>
           <p className="text-slate-400 text-xs mt-1">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>

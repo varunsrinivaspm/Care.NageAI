@@ -98,20 +98,43 @@ export async function GET() {
     workout_count:   weekWorkoutsRes.data?.length ?? 0,
   }
 
+  const noData = history.length === 0
+
+  // Fallback demo data when DB is empty
+  const fallbackHistory = noData ? Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+    return {
+      date:           d.toISOString().split('T')[0],
+      sleep_score:    68 + Math.round(Math.sin(i) * 12),
+      recovery_score: 72 + Math.round(Math.cos(i) * 10),
+      strain_score:   60 + Math.round(Math.sin(i + 1) * 15),
+      care_score:     67 + Math.round(Math.cos(i + 1) * 8),
+    }
+  }) : history
+
+  const fallbackLatest = noData ? fallbackHistory[fallbackHistory.length - 1] : latest
+
   return NextResponse.json({
     today: {
-      sleep_score:    latest?.sleep_score    ?? null,
-      recovery_score: latest?.recovery_score ?? null,
-      strain_score:   latest?.strain_score   ?? null,
-      care_score:     latest?.care_score     ?? null,
-      sleep_hrs:      sleep ? Math.round(sleep.duration_min / 60 * 10) / 10 : null,
-      deep_sleep_min: sleep?.deep_sleep_min ?? null,
-      rem_sleep_min:  sleep?.rem_sleep_min  ?? null,
-      steps:          steps?.count ?? null,
-      hrv_ms:         hrv?.sdnn_ms ?? null,
+      sleep_score:    fallbackLatest?.sleep_score    ?? null,
+      recovery_score: fallbackLatest?.recovery_score ?? null,
+      strain_score:   fallbackLatest?.strain_score   ?? null,
+      care_score:     fallbackLatest?.care_score     ?? null,
+      sleep_hrs:      sleep ? Math.round(sleep.duration_min / 60 * 10) / 10 : (noData ? 7.2 : null),
+      deep_sleep_min: sleep?.deep_sleep_min ?? (noData ? 82 : null),
+      rem_sleep_min:  sleep?.rem_sleep_min  ?? (noData ? 94 : null),
+      steps:          steps?.count          ?? (noData ? 8340 : null),
+      hrv_ms:         hrv?.sdnn_ms          ?? (noData ? 58 : null),
     },
-    weekly,
-    history: history.map(r => ({
+    weekly: noData ? {
+      avg_sleep_hrs:   7.1,
+      avg_deep_min:    78,
+      avg_rem_min:     91,
+      avg_hrv_ms:      55,
+      avg_daily_steps: 8200,
+      workout_count:   4,
+    } : weekly,
+    history: fallbackHistory.map(r => ({
       date:           r.date,
       sleep_score:    r.sleep_score,
       recovery_score: r.recovery_score,
