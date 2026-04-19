@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin, DEMO_USER_ID } from '@/lib/supabase-admin'
+import { supabaseAdmin, getAuthUserId } from '@/lib/supabase-admin'
 
 function sevenDaysAgo() {
   const d = new Date()
@@ -8,7 +8,7 @@ function sevenDaysAgo() {
 }
 
 export async function GET() {
-  const userId = DEMO_USER_ID
+  const userId = await getAuthUserId()
   const today = new Date().toISOString().split('T')[0]
   const weekAgo = sevenDaysAgo()
 

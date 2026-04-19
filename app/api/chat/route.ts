@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk'
 import { NextRequest } from 'next/server'
-import { supabaseAdmin, DEMO_USER_ID } from '@/lib/supabase-admin'
+import { supabaseAdmin, getAuthUserId } from '@/lib/supabase-admin'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -9,8 +9,7 @@ interface Message {
   content: string
 }
 
-async function buildSystemPrompt(): Promise<string> {
-  const userId = DEMO_USER_ID
+async function buildSystemPrompt(userId: string): Promise<string> {
 
   const [userRes, weeklyRes, latestScoreRes] = await Promise.all([
     supabaseAdmin.from('users').select('*').eq('id', userId).single(),
@@ -63,8 +62,8 @@ Guidelines:
 
 export async function POST(req: NextRequest) {
   const { messages }: { messages: Message[] } = await req.json()
-
-  const systemPrompt = await buildSystemPrompt()
+  const userId = await getAuthUserId()
+  const systemPrompt = await buildSystemPrompt(userId)
 
   const stream = await groq.chat.completions.create({
     model: 'openai/gpt-oss-120b',
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
   if (lastUserMsg) {
     supabaseAdmin.from('chat_history').insert({
-      user_id: DEMO_USER_ID,
+      user_id: userId,
       role: 'user',
       content: lastUserMsg.content,
     }).then(() => {})
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
       // Save assistant response to chat history
       if (fullResponse) {
         supabaseAdmin.from('chat_history').insert({
-          user_id: DEMO_USER_ID,
+          user_id: userId,
           role: 'assistant',
           content: fullResponse,
         }).then(() => {})

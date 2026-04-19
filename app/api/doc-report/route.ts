@@ -1,6 +1,6 @@
 import Groq from 'groq-sdk'
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin, DEMO_USER_ID } from '@/lib/supabase-admin'
+import { supabaseAdmin, getAuthUserId } from '@/lib/supabase-admin'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -12,7 +12,7 @@ function daysAgo(n: number) {
 
 export async function POST(req: NextRequest) {
   const { symptoms, dateRange } = await req.json()
-  const userId = DEMO_USER_ID
+  const userId = await getAuthUserId()
 
   const days = dateRange === 'Last 30 days' ? 30 : dateRange === 'Last 14 days' ? 14 : 7
   const fromDate = daysAgo(days)
